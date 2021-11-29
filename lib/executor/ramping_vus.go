@@ -515,7 +515,12 @@ func (vlv RampingVUs) Run(
 	maxVUs := lib.GetMaxPlannedVUs(gracefulExecutionSteps)
 	gracefulStop := maxDuration - regularDuration
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, regularDuration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		vlv.config.clock,
+		regularDuration,
+		gracefulStop,
+	)
 	defer cancel()
 
 	activeVUs := &sync.WaitGroup{}
