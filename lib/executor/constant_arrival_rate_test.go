@@ -71,7 +71,7 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -101,7 +101,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	var count int64
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -199,7 +199,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			es := lib.NewExecutionState(lib.Options{
 				ExecutionSegment:         test.segment,
 				ExecutionSegmentSequence: test.sequence,
-			}, et, 10, 50)
+			}, et, 10, 50, 1, 1)
 			var count int64
 			seconds := 2
 			config := getTestConstantArrivalRateConfig()
@@ -272,7 +272,7 @@ func TestArrivalRateCancel(t *testing.T) {
 			weAreDoneCh := make(chan struct{})
 			et, err := lib.NewExecutionTuple(nil, nil)
 			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+			es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 			ctx, cancel, executor, logHook := setupExecutor(
 				t, config, es, simpleRunner(func(ctx context.Context) error {
 					select {
@@ -326,7 +326,7 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 		MaxVUs:          null.IntFrom(5),
 	}
 
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -381,7 +381,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 			require.NoError(t, err)
 			et, err := lib.NewExecutionTuple(seg, &ess)
 			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+			es := lib.NewExecutionState(lib.Options{}, et, 5, 5, 1, 1)
 
 			runner := &minirunner.MiniRunner{}
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)

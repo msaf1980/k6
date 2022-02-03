@@ -304,7 +304,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	execScheduler, err := local.NewExecutionScheduler(runner, testutils.NewLogger(t))
+	execScheduler, err := local.NewExecutionScheduler(runner, testutils.NewLogger(t), 1)
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()
@@ -2322,7 +2322,7 @@ func TestExecutionInfo(t *testing.T) {
 			initVU, err := r.NewVU(1, 10, samples)
 			require.NoError(t, err)
 
-			execScheduler, err := local.NewExecutionScheduler(r, testutils.NewLogger(t))
+			execScheduler, err := local.NewExecutionScheduler(r, testutils.NewLogger(t), 1)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())

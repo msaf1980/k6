@@ -32,6 +32,7 @@ import (
 	"os/signal"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -106,231 +107,241 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			initRunner, err := newRunner(logger, src, globalFlags.runType, filesystems, runtimeOptions, builtinMetrics, registry)
-			if err != nil {
-				return common.UnwrapGojaInterruptedError(err)
-			}
-
 			logger.Debug("Getting the script options...")
 
 			cliConf, err := getConfig(cmd.Flags())
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(
-				afero.NewOsFs(), cliConf, initRunner.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
-			if err != nil {
-				return err
-			}
 
-			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
-			if err != nil {
-				return err
-			}
+			var currentCycle int64
+			for currentCycle = 1; currentCycle <= cliConf.Options.Cycles.Int64; currentCycle++ {
 
-			// Write options back to the runner too.
-			if err = initRunner.SetOptions(conf.Options); err != nil {
-				return err
-			}
-
-			// We prepare a bunch of contexts:
-			//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
-			//    and can trigger things like the usage report and end of test summary.
-			//    Crucially, metrics processing by the Engine will still work after this
-			//    context is cancelled!
-			//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
-			//    event when k6 was ran with the --linger option.
-			//  - The globalCtx is cancelled only after we're completely done with the
-			//    test execution and any --linger has been cleared, so that the Engine
-			//    can start winding down its metrics processing.
-			globalCtx, globalCancel := context.WithCancel(ctx)
-			defer globalCancel()
-			lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-			defer lingerCancel()
-			runCtx, runCancel := context.WithCancel(lingerCtx)
-			defer runCancel()
-
-			// Create a local execution scheduler wrapping the runner.
-			logger.Debug("Initializing the execution scheduler...")
-			execScheduler, err := local.NewExecutionScheduler(initRunner, logger)
-			if err != nil {
-				return err
-			}
-
-			// This is manually triggered after the Engine's Run() has completed,
-			// and things like a single Ctrl+C don't affect it. We use it to make
-			// sure that the progressbars finish updating with the latest execution
-			// state one last time, after the test run has finished.
-			progressCtx, progressCancel := context.WithCancel(globalCtx)
-			defer progressCancel()
-			initBar := execScheduler.GetInitProgressBar()
-			progressBarWG := &sync.WaitGroup{}
-			progressBarWG.Add(1)
-			go func() {
-				pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
-				for _, s := range execScheduler.GetExecutors() {
-					pbs = append(pbs, s.GetProgress())
+				registry := metrics.NewRegistry()
+				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+				initRunner, err := newRunner(logger, src, globalFlags.runType, filesystems, runtimeOptions, builtinMetrics, registry)
+				if err != nil {
+					return common.UnwrapGojaInterruptedError(err)
 				}
-				showProgress(progressCtx, pbs, logger, globalFlags)
-				progressBarWG.Done()
-			}()
 
-			// Create all outputs.
-			executionPlan := execScheduler.GetExecutionPlan()
-			outputs, err := createOutputs(conf.Out, src, conf, runtimeOptions, executionPlan, osEnvironment, logger, globalFlags)
-			if err != nil {
-				return err
-			}
+				conf, err := getConsolidatedConfig(
+					afero.NewOsFs(), cliConf, initRunner.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
+				if err != nil {
+					return err
+				}
 
-			// Create the engine.
-			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger, builtinMetrics)
-			if err != nil {
-				return err
-			}
+				conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
+				if err != nil {
+					return err
+				}
 
-			// Spin up the REST API server, if not disabled.
-			if globalFlags.address != "" {
-				initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+				// Write options back to the runner too.
+				if err = initRunner.SetOptions(conf.Options); err != nil {
+					return err
+				}
+
+				// We prepare a bunch of contexts:
+				//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
+				//    and can trigger things like the usage report and end of test summary.
+				//    Crucially, metrics processing by the Engine will still work after this
+				//    context is cancelled!
+				//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
+				//    event when k6 was ran with the --linger option.
+				//  - The globalCtx is cancelled only after we're completely done with the
+				//    test execution and any --linger has been cleared, so that the Engine
+				//    can start winding down its metrics processing.
+				globalCtx, globalCancel := context.WithCancel(ctx)
+				defer globalCancel()
+				lingerCtx, lingerCancel := context.WithCancel(globalCtx)
+				defer lingerCancel()
+				runCtx, runCancel := context.WithCancel(lingerCtx)
+				defer runCancel()
+
+				// Create a local execution scheduler wrapping the runner.
+				logger.Debug("Initializing the execution scheduler...")
+				execScheduler, err := local.NewExecutionScheduler(initRunner, logger, currentCycle)
+				if err != nil {
+					return err
+				}
+
+				// This is manually triggered after the Engine's Run() has completed,
+				// and things like a single Ctrl+C don't affect it. We use it to make
+				// sure that the progressbars finish updating with the latest execution
+				// state one last time, after the test run has finished.
+				progressCtx, progressCancel := context.WithCancel(globalCtx)
+				defer progressCancel()
+				initBar := execScheduler.GetInitProgressBar()
+				progressBarWG := &sync.WaitGroup{}
+				progressBarWG.Add(1)
 				go func() {
-					logger.Debugf("Starting the REST API server on %s", globalFlags.address)
-					if aerr := api.ListenAndServe(globalFlags.address, engine, logger); aerr != nil {
-						// Only exit k6 if the user has explicitly set the REST API address
-						if cmd.Flags().Lookup("address").Changed {
-							logger.WithError(aerr).Error("Error from API server")
-							os.Exit(int(exitcodes.CannotStartRESTAPI))
-						} else {
-							logger.WithError(aerr).Warn("Error from API server")
+					pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
+					for _, s := range execScheduler.GetExecutors() {
+						pbs = append(pbs, s.GetProgress())
+					}
+					showProgress(progressCtx, pbs, logger, globalFlags)
+					progressBarWG.Done()
+				}()
+
+				// Create all outputs.
+				executionPlan := execScheduler.GetExecutionPlan()
+				outputs, err := createOutputs(conf.Out, src, conf, runtimeOptions, executionPlan, osEnvironment, logger, globalFlags)
+				if err != nil {
+					return err
+				}
+
+				// Create the engine.
+				initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+				engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger, builtinMetrics)
+				if err != nil {
+					return err
+				}
+
+				// Spin up the REST API server, if not disabled.
+				if globalFlags.address != "" {
+					initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+					go func() {
+						logger.Debugf("Starting the REST API server on %s", globalFlags.address)
+						if aerr := api.ListenAndServe(globalFlags.address, engine, logger); aerr != nil {
+							// Only exit k6 if the user has explicitly set the REST API address
+							if cmd.Flags().Lookup("address").Changed {
+								logger.WithError(aerr).Error("Error from API server")
+								os.Exit(int(exitcodes.CannotStartRESTAPI))
+							} else {
+								logger.WithError(aerr).Warn("Error from API server")
+							}
 						}
-					}
-				}()
-			}
-
-			// We do this here so we can get any output URLs below.
-			initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-			err = engine.StartOutputs()
-			if err != nil {
-				return err
-			}
-			defer engine.StopOutputs()
-
-			printExecutionDescription(
-				"local", args[0], "", conf, execScheduler.GetState().ExecutionTuple,
-				executionPlan, outputs, globalFlags.noColor || !globalFlags.stdoutTTY, globalFlags)
-
-			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 1)
-			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer signal.Stop(sigC)
-			go func() {
-				sig := <-sigC
-				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
-				lingerCancel() // stop the test run, metric processing is cancelled below
-
-				// If we get a second signal, we immediately exit, so something like
-				// https://github.com/k6io/k6/issues/971 never happens again
-				sig = <-sigC
-				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
-				globalCancel() // not that it matters, given the following command...
-				os.Exit(int(exitcodes.ExternalAbort))
-			}()
-
-			// Initialize the engine
-			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
-			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
-			if err != nil {
-				err = common.UnwrapGojaInterruptedError(err)
-				// Add a generic engine exit code if we don't have a more specific one
-				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
-			}
-
-			// Init has passed successfully, so unless disabled, make sure we send a
-			// usage report after the context is done.
-			if !conf.NoUsageReport.Bool {
-				reportDone := make(chan struct{})
-				go func() {
-					<-runCtx.Done()
-					_ = reportUsage(execScheduler)
-					close(reportDone)
-				}()
-				defer func() {
-					select {
-					case <-reportDone:
-					case <-time.After(3 * time.Second):
-					}
-				}()
-			}
-
-			// Start the test run
-			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-			var interrupt error
-			err = engineRun()
-			if err != nil {
-				err = common.UnwrapGojaInterruptedError(err)
-				if common.IsInterruptError(err) {
-					// Don't return here since we need to work with --linger,
-					// show the end-of-test summary and exit cleanly.
-					interrupt = err
+					}()
 				}
-				if !conf.Linger.Bool && interrupt == nil {
+
+				// We do this here so we can get any output URLs below.
+				initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
+				err = engine.StartOutputs()
+				if err != nil {
+					return err
+				}
+				defer engine.StopOutputs()
+
+				printExecutionDescription(
+					"local", args[0], "", conf, execScheduler.GetState().ExecutionTuple,
+					executionPlan, outputs, globalFlags.noColor || !globalFlags.stdoutTTY, globalFlags)
+
+				// Trap Interrupts, SIGINTs and SIGTERMs.
+				var isBreak int32
+				sigC := make(chan os.Signal, 1)
+				signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+				defer signal.Stop(sigC)
+				go func() {
+					sig := <-sigC
+					logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
+					atomic.StoreInt32(&isBreak, 1)
+					lingerCancel() // stop the test run, metric processing is cancelled below
+
+					// If we get a second signal, we immediately exit, so something like
+					// https://github.com/k6io/k6/issues/971 never happens again
+					sig = <-sigC
+					logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
+					globalCancel() // not that it matters, given the following command...
+					os.Exit(int(exitcodes.ExternalAbort))
+				}()
+
+				// Initialize the engine
+				initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
+				engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
+				if err != nil {
+					err = common.UnwrapGojaInterruptedError(err)
+					// Add a generic engine exit code if we don't have a more specific one
 					return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
 				}
-			}
-			runCancel()
-			logger.Debug("Engine run terminated cleanly")
 
-			progressCancel()
-			progressBarWG.Wait()
-
-			executionState := execScheduler.GetState()
-			// Warn if no iterations could be completed.
-			if executionState.GetFullIterationCount() == 0 {
-				logger.Warn("No script iterations finished, consider making the test duration longer")
-			}
-
-			// Handle the end-of-test summary.
-			if !runtimeOptions.NoSummary.Bool {
-				summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
-					Metrics:         engine.Metrics,
-					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
-					TestRunDuration: executionState.GetCurrentTestRunDuration(),
-					NoColor:         globalFlags.noColor,
-					UIState: lib.UIState{
-						IsStdOutTTY: globalFlags.stdoutTTY,
-						IsStdErrTTY: globalFlags.stderrTTY,
-					},
-				})
-				if err == nil {
-					err = handleSummaryResult(afero.NewOsFs(), globalFlags.stdout, globalFlags.stderr, summaryResult)
+				// Init has passed successfully, so unless disabled, make sure we send a
+				// usage report after the context is done.
+				if !conf.NoUsageReport.Bool {
+					reportDone := make(chan struct{})
+					go func() {
+						<-runCtx.Done()
+						_ = reportUsage(execScheduler)
+						close(reportDone)
+					}()
+					defer func() {
+						select {
+						case <-reportDone:
+						case <-time.After(3 * time.Second):
+						}
+					}()
 				}
+
+				// Start the test run
+				initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
+				var interrupt error
+				err = engineRun()
 				if err != nil {
-					logger.WithError(err).Error("failed to handle the end-of-test summary")
+					err = common.UnwrapGojaInterruptedError(err)
+					if common.IsInterruptError(err) {
+						// Don't return here since we need to work with --linger,
+						// show the end-of-test summary and exit cleanly.
+						interrupt = err
+					}
+					if !conf.Linger.Bool && interrupt == nil {
+						return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+					}
 				}
-			}
+				runCancel()
+				logger.Debug("Engine run terminated cleanly")
 
-			if conf.Linger.Bool {
-				select {
-				case <-lingerCtx.Done():
-					// do nothing, we were interrupted by Ctrl+C already
-				default:
-					logger.Debug("Linger set; waiting for Ctrl+C...")
-					fprintf(globalFlags.stdout, "Linger set; waiting for Ctrl+C...")
-					<-lingerCtx.Done()
-					logger.Debug("Ctrl+C received, exiting...")
+				progressCancel()
+				progressBarWG.Wait()
+
+				executionState := execScheduler.GetState()
+				// Warn if no iterations could be completed.
+				if executionState.GetFullIterationCount() == 0 {
+					logger.Warn("No script iterations finished, consider making the test duration longer")
 				}
-			}
-			globalCancel() // signal the Engine that it should wind down
-			logger.Debug("Waiting for engine processes to finish...")
-			engineWait()
-			logger.Debug("Everything has finished, exiting k6!")
-			if interrupt != nil {
-				return interrupt
-			}
-			if engine.IsTainted() {
-				return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
-			}
+
+				// Handle the end-of-test summary.
+				if !runtimeOptions.NoSummary.Bool {
+					summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
+						Metrics:         engine.Metrics,
+						RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+						TestRunDuration: executionState.GetCurrentTestRunDuration(),
+						NoColor:         globalFlags.noColor,
+						UIState: lib.UIState{
+							IsStdOutTTY: globalFlags.stdoutTTY,
+							IsStdErrTTY: globalFlags.stderrTTY,
+						},
+					})
+					if err == nil {
+						err = handleSummaryResult(afero.NewOsFs(), globalFlags.stdout, globalFlags.stderr, summaryResult)
+					}
+					if err != nil {
+						logger.WithError(err).Error("failed to handle the end-of-test summary")
+					}
+				}
+
+				if conf.Linger.Bool {
+					select {
+					case <-lingerCtx.Done():
+						// do nothing, we were interrupted by Ctrl+C already
+					default:
+						logger.Debug("Linger set; waiting for Ctrl+C...")
+						fprintf(globalFlags.stdout, "Linger set; waiting for Ctrl+C...")
+						<-lingerCtx.Done()
+						logger.Debug("Ctrl+C received, exiting...")
+					}
+				}
+				globalCancel() // signal the Engine that it should wind down
+				logger.Debug("Waiting for engine processes to finish...")
+				engineWait()
+				logger.Debug("Everything has finished, exiting k6!")
+				if interrupt != nil {
+					return interrupt
+				}
+				if engine.IsTainted() {
+					return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
+				}
+				if atomic.LoadInt32(&isBreak) == 1 {
+					break
+				}
+			} // end of cycles
 			return nil
 		},
 	}

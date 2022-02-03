@@ -74,7 +74,7 @@ func newTestExecutionScheduler(
 		logger.SetOutput(testutils.NewTestOutput(t))
 	}
 
-	execScheduler, err = NewExecutionScheduler(runner, logger)
+	execScheduler, err = NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	samples = make(chan stats.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
@@ -140,7 +140,7 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, logger)
+			execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -252,7 +252,7 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}, builtinMetrics, registry)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, logger)
+			execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -323,7 +323,7 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		SystemTags: &stats.DefaultSystemTagSet,
 	})))
 
-	execScheduler, err := NewExecutionScheduler(runner, logger)
+	execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -460,7 +460,7 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, logger)
+			execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -623,7 +623,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}}, builtinMetrics, registry)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, logger)
+	execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -964,7 +964,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 
-	execScheduler, err := NewExecutionScheduler(runner, logger)
+	execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	registry := metrics.NewRegistry()
@@ -1172,7 +1172,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, runner.SetOptions(options))
 
-	execScheduler, err := NewExecutionScheduler(runner, logger)
+	execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1293,7 +1293,7 @@ func TestSetPaused(t *testing.T) {
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		sched, err := NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger, 1)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 
@@ -1308,7 +1308,7 @@ func TestSetPaused(t *testing.T) {
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		sched, err := NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger, 1)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		err = sched.SetPaused(false)
@@ -1321,7 +1321,7 @@ func TestSetPaused(t *testing.T) {
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		sched, err := NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger, 1)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		require.NoError(t, sched.SetPaused(true))
@@ -1336,7 +1336,7 @@ func TestSetPaused(t *testing.T) {
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		sched, err := NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger, 1)
 		require.NoError(t, err)
 		expectedErr := errors.New("testing pausable executor error")
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
@@ -1357,7 +1357,7 @@ func TestSetPaused(t *testing.T) {
 
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
-		sched, err := NewExecutionScheduler(runner, logger)
+		sched, err := NewExecutionScheduler(runner, logger, 1)
 		require.NoError(t, err)
 		err = sched.SetPaused(true)
 		require.Error(t, err)
@@ -1418,7 +1418,7 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, logger)
+	execScheduler, err := NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	assert.Len(t, execScheduler.executors, 2)

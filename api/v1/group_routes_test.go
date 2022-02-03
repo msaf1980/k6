@@ -49,7 +49,7 @@ func TestGetGroups(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger, 1)
 	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

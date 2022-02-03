@@ -52,7 +52,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 	var result sync.Map
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -89,7 +89,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	)
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -140,7 +140,7 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 		MaxDuration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {

@@ -181,6 +181,12 @@ type ExecutionState struct {
 	// MaxTimeToWaitForPlannedVU.
 	vus chan InitializedVU
 
+	// Current execution cycle
+	currentCycle int64
+
+	// Totalt execution cycles
+	totalCycles int64
+
 	// The segmented index used to generate unique local (current k6 instance)
 	// and global (across k6 instances) VU IDs, starting from 1
 	// (for backwards compatibility...).
@@ -277,7 +283,7 @@ type ExecutionState struct {
 // NewExecutionState initializes all of the pointers in the ExecutionState
 // with zeros. It also makes sure that the initial state is unpaused, by
 // setting resumeNotify to an already closed channel.
-func NewExecutionState(options Options, et *ExecutionTuple, maxPlannedVUs, maxPossibleVUs uint64) *ExecutionState {
+func NewExecutionState(options Options, et *ExecutionTuple, maxPlannedVUs, maxPossibleVUs uint64, currentCycle, totalCycles int64) *ExecutionState {
 	resumeNotify := make(chan struct{})
 	close(resumeNotify) // By default the ExecutionState starts unpaused
 
@@ -299,6 +305,8 @@ func NewExecutionState(options Options, et *ExecutionTuple, maxPlannedVUs, maxPo
 		startTime:                  new(int64),
 		endTime:                    new(int64),
 		currentPauseTime:           new(int64),
+		currentCycle:               currentCycle,
+		totalCycles:                totalCycles,
 		pauseStateLock:             sync.RWMutex{},
 		totalPausedDuration:        0, // Accessed only behind the pauseStateLock
 		resumeNotify:               resumeNotify,
@@ -348,6 +356,20 @@ func (es *ExecutionState) GetCurrentlyActiveVUsCount() int64 {
 // IMPORTANT: for UI/information purposes only, don't use for synchronization.
 func (es *ExecutionState) ModCurrentlyActiveVUsCount(mod int64) int64 {
 	return atomic.AddInt64(es.activeVUs, mod)
+}
+
+// GetCurrentCycle returns the current execution cycle
+//
+// IMPORTANT: for UI/information purposes only
+func (es *ExecutionState) GetCurrentCycle() int64 {
+	return es.currentCycle
+}
+
+// GetTotalCycles returns the total execution cycles
+//
+// IMPORTANT: for UI/information purposes only
+func (es *ExecutionState) GetTotalCycles() int64 {
+	return es.totalCycles
 }
 
 // GetFullIterationCount returns the total of full (i.e uninterrupted) iterations

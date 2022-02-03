@@ -75,7 +75,7 @@ func newTestEngine( //nolint:golint
 
 	require.NoError(t, runner.SetOptions(newOpts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 
 	registry := metrics.NewRegistry()
@@ -824,7 +824,7 @@ func TestVuInitException(t *testing.T) {
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 	engine, err := NewEngine(execScheduler, opts, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
 	require.NoError(t, err)
@@ -1209,7 +1209,7 @@ func TestActiveVUsCount(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, logger, 1)
 	require.NoError(t, err)
 	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger, builtinMetrics)
 	require.NoError(t, err)

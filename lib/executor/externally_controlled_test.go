@@ -50,7 +50,7 @@ func TestExternallyControlledRun(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 
 	doneIters := new(uint64)
 	ctx, cancel, executor, _ := setupExecutor(

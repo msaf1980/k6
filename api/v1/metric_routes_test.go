@@ -45,7 +45,7 @@ func TestGetMetrics(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger, 1)
 	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -101,7 +101,7 @@ func TestGetMetric(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger, 1)
 	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

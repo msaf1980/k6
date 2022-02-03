@@ -84,7 +84,7 @@ func TestRampingVUsRun(t *testing.T) {
 	var iterCount int64
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -141,7 +141,7 @@ func TestRampingVUsGracefulStopWaits(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -190,7 +190,7 @@ func TestRampingVUsGracefulStopStops(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -244,7 +244,7 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
@@ -349,7 +349,7 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 	require.NoError(t, err)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, cfg,
-		lib.NewExecutionState(lib.Options{}, et, maxVus, maxVus),
+		lib.NewExecutionState(lib.Options{}, et, maxVus, maxVus, 1, 1),
 		simpleRunner(iteration),
 	)
 	defer cancel()
@@ -382,7 +382,7 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {

@@ -285,6 +285,7 @@ type Options struct {
 	Duration   types.NullDuration `json:"duration" envconfig:"K6_DURATION"`
 	Iterations null.Int           `json:"iterations" envconfig:"K6_ITERATIONS"`
 	Stages     []Stage            `json:"stages" envconfig:"K6_STAGES"`
+	Cycles     null.Int           `json:"cycles" envconfig:"K6_CYCLES"`
 
 	// TODO: remove the `ignored:"true"` from the field tags, it's there so that
 	// the envconfig library will ignore those fields.

@@ -69,7 +69,7 @@ func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -98,7 +98,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	var count int64
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 50, 1, 1)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
@@ -139,7 +139,7 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
+	es := lib.NewExecutionState(lib.Options{}, et, 1, 3, 1, 1)
 	var count int64
 	ch := make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
 	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
@@ -206,7 +206,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
+	es := lib.NewExecutionState(lib.Options{}, et, 1, 3, 1, 1)
 	var count int64
 	ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
 	runner := simpleRunner(func(ctx context.Context) error {
@@ -258,7 +258,7 @@ func TestRampingArrivalRateRunGracefulStop(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 10)
+	es := lib.NewExecutionState(lib.Options{}, et, 10, 10, 1, 1)
 
 	runner := simpleRunner(func(ctx context.Context) error {
 		time.Sleep(5 * time.Second)
@@ -315,7 +315,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 				}
 			}()
 
-			es := lib.NewExecutionState(lib.Options{}, mustNewExecutionTuple(nil, nil), uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64))
+			es := lib.NewExecutionState(lib.Options{}, mustNewExecutionTuple(nil, nil), uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64), 1, 1)
 
 			var count int64
 			runner := simpleRunner(func(ctx context.Context) error {
@@ -742,7 +742,7 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 			require.NoError(t, err)
 			et, err := lib.NewExecutionTuple(seg, &ess)
 			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+			es := lib.NewExecutionState(lib.Options{}, et, 5, 5, 1, 1)
 
 			runner := &minirunner.MiniRunner{}
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)

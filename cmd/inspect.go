@@ -137,7 +137,7 @@ func addExecRequirements(b *js.Bundle,
 	if err = runner.SetOptions(conf.Options); err != nil {
 		return nil, err
 	}
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, logger, 1)
 	if err != nil {
 		return nil, err
 	}

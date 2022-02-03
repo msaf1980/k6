@@ -60,7 +60,7 @@ var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 // instance, without initializing it beyond the bare minimum. Specifically, it
 // creates the needed executor instances and a lot of state placeholders, but it
 // doesn't initialize the executors and it doesn't initialize or run VUs.
-func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*ExecutionScheduler, error) {
+func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger, currentCycle int64) (*ExecutionScheduler, error) {
 	options := runner.GetOptions()
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
@@ -70,7 +70,7 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs, currentCycle, options.Cycles.Int64)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Scenarios.GetSortedConfigs()
@@ -186,9 +186,10 @@ func (e *ExecutionScheduler) getRunStats() string {
 
 	vusFmt := pb.GetFixedLengthIntFormat(int64(e.maxPossibleVUs))
 	return fmt.Sprintf(
-		"%s, "+vusFmt+"/"+vusFmt+" VUs, %d complete and %d interrupted iterations",
+		"%s, "+vusFmt+"/"+vusFmt+" VUs, %d complete and %d interrupted iterations, cycle %d of %d",
 		status, e.state.GetCurrentlyActiveVUsCount(), e.state.GetInitializedVUsCount(),
 		e.state.GetFullIterationCount(), e.state.GetPartialIterationCount(),
+		e.state.GetCurrentCycle(), e.state.GetTotalCycles(),
 	)
 }
 

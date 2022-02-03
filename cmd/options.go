@@ -52,6 +52,7 @@ func optionFlagSet() *pflag.FlagSet {
 
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
+	flags.Int64P("cycles", "C", 1, "executions cycles count (for long duration tests)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
 	flags.String("execution-segment", "", "limit execution to the specified segment, e.g. 10%, 1/3, 0.2:2/3")
 	flags.String("execution-segment-sequence", "", "the execution segment sequence") // TODO better description
@@ -108,6 +109,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		VUs:                   getNullInt64(flags, "vus"),
 		Duration:              getNullDuration(flags, "duration"),
 		Iterations:            getNullInt64(flags, "iterations"),
+		Cycles:                getNullInt64(flags, "cycles"),
 		Paused:                getNullBool(flags, "paused"),
 		NoSetup:               getNullBool(flags, "no-setup"),
 		NoTeardown:            getNullBool(flags, "no-teardown"),
